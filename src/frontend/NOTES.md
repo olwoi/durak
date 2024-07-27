@@ -1,0 +1,1 @@
+- 32 boolean array (x4 for holding, 
