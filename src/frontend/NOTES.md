@@ -1,5 +1,0 @@
-- 32 boolean array (x4: own cards, opponent cards, pull stack, discard stack)
-    - possibly an additional for table cards
-- Save current trump (int 0-3)
-    - determine rest of order (decreasing order of value)
-- Visualize cards: emojis?

@@ -1,7 +1,7 @@
 from typing import List
 import numpy as np
 
-CARDS = np.array(['A', 'K', 'Q', 'J', 'T', '9', '8', '7'])
+RANKS = np.array(['A', 'K', 'Q', 'J', 'T', '9', '8', '7'])
 SUITS = np.array(['♠', '♣', '♦', '♥'])
 
 import numpy as np
@@ -42,13 +42,13 @@ def get_card_list(trump: int) -> np.ndarray:
     ordered_suits = SUITS[ordering]
 
     # Create the 32 cards
-    ranks = np.tile(CARDS, 4).reshape(4, 8)
+    ranks = np.tile(RANKS, 4).reshape(4, 8)
     suits = np.tile(ordered_suits[:, None], 8).reshape(4, 8)
     cards = np.char.add(ranks, suits)
 
     return cards.flatten()
 
-def convert_cards_to_strings(cards: np.ndarray, trump: int) -> List[str]:
+def convert_cards_to_strings(cards: np.ndarray, trump: int) ->  np.ndarray:
     """
     Converts a boolean array of size 32 representing the cards to be displayed into a list of card strings.
 
@@ -74,13 +74,38 @@ def convert_cards_to_strings(cards: np.ndarray, trump: int) -> List[str]:
 
     return selected_cards
 
+def convert_boolean_matrix(matrix: np.ndarray, trump: int) -> List[np.ndarray]:
+    """
+    Converts a boolean matrix of size (n, 32) representing the cards to be displayed into a list of card strings.
+
+    Args:
+        matrix (np.ndarray): A boolean matrix of size (n, 32) representing the cards to be displayed.
+        trump (int): An integer representing the ordering of the suits.
+
+    Returns:
+        List[np.ndarray]: A list of card strings.
+
+    Raises:
+        AssertionError: If the type of `matrix` is not a numpy array.
+        AssertionError: If the shape of `matrix` is not (4, 32).
+        AssertionError: If the dtype of `matrix` is not bool.
+    """
+    assert type(matrix) == np.ndarray, "Matrix must be a numpy array"
+    assert matrix.shape[1] == 32, "Matrix must have 32 columns"
+    assert matrix.dtype == bool, "Matrix must be a boolean array"
+
+    card_list = get_card_list(trump)
+
+    # Get the selected cards for each row (location)
+    selected_cards = [card_list[cards] for cards in matrix]
+
+    return selected_cards
 
 if __name__ == '__main__':
-    trump = 0
-    card_ids = np.array([3, 6])
+    matrix = np.zeros((4, 32), dtype=bool)
+    matrix[0, [3,6,8]] = True
+    matrix[1, [4,5,11]] = True
+    trump = 2
 
-    cards = np.zeros(32, dtype=bool)
-    cards[card_ids] = True
-
-    selected_cards = convert_cards_to_strings(cards, trump)
-    print(selected_cards)
+    output = convert_boolean_matrix(matrix, trump)
+    print(output)
