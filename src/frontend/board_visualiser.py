@@ -1,5 +1,5 @@
-from state_wrapper import State
-from card_visualiser import CardVisualiser, RANKS, SUITS
+from frontend.state_wrapper import State
+from frontend.card_visualiser import CardVisualiser, RANKS, SUITS
 import numpy as np
 
 class BoardVisualiser:

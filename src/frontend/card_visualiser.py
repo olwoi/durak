@@ -57,7 +57,7 @@ class CardVisualiser():
         """
         assert type(cards) == np.ndarray, "Cards must be a numpy array"
         assert cards.shape == (32,), "Cards must be a 1D array of length 32"
-        assert cards.dtype == bool, "Cards must be a boolean array"
+        # assert cards.dtype == bool, "Cards must be a boolean array"
 
         # Retrieve selected cards from card list
         selected_cards = self.card_list[cards]

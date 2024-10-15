@@ -27,7 +27,7 @@ class Game:
 
     def __init__(self):
 
-        self.state = np.zeros((32, 6))
+        self.state = np.zeros((6, 32), dtype=bool)
         # Shuffle deck and deal cards
         deck = np.random.permutation(32)
         coser = np.random.randint(0,7)
