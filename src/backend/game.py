@@ -22,7 +22,7 @@ class Game:
     3       |   Cards left to Defend | 0: Trump Ace, 1: Trump King, etc
     4       |   Cards Played on Board| 0: Trump Ace, 1: Trump King, etc
     5       |   Coser | Extra Values | 0: Ace,...,7: Seven, 8: Player 0's Turn,
-    5       |       Extra Values     | 9: Player 1's Turn, 10: Player 0 is attacking
+    5       |       Extra Values     | 9: Player 0 is attacking
     """
 
     def __init__(self):
@@ -46,21 +46,19 @@ class Game:
 
 
     def user_update(self, move):
-        if self.state[5,8] and self.state[5,10]: # Player 0's turn to attack
+        if self.state[5,8] and self.state[5,9]: # Player 0's turn to attack
             legal = self.attack(move,0) # Player 0 attacks
             if not legal:
                 self.send_state(False)
             else: 
                 self.state[5,8] = 0
-                self.state[5,9] = 1
                 self.send_state(True)
-        elif self.state[5,9] and not self.state[5,10]: # Player 1's turn to attack
+        elif not self.state[5,8] and not self.state[5,9]: # Player 1's turn to attack
             legal = self.attack(move,1) # Player 1 attacks
             if not legal:
                 self.send_state(False)
             else:  
                 self.state[5,8] = 1
-                self.state[5,9] = 0
                 self.send_state(True)
         elif self.state[5,8] and not self.state[5,10]: # Player 0's turn to defend
             pass
@@ -76,7 +74,10 @@ class Game:
             player: 0-1 indicates what player attempted to do this move
         
         """
+        assert np.allclose(move[1-player], ZEROES) # Opponents hand doesnt change
+        assert np.allclose(move[2,:],ZEROES) #Cards arent being pulled
 
+        #TODO make sure that opponent has enough cards left 2 defend
 
         new = self.state + move
         
@@ -88,17 +89,18 @@ class Game:
             print("Opponents cards changed during attack")
             return False
         
-        #Any card that is added to left 2 defend and cards on board
+        #Any card that is added to left 2 defend hast to be also added to cards on board
         if not np.allclose(move[3,0:],move[4,0:]): 
             print("Cards played on board not updated")
             return False
 
 
         # Isolate all the values of cards that could legally could be added to the board :LegalToAdd
-        played = self.state[4,0:7] +self.state[4,8:15] + self.state[4,16:23] + self.state[4,24:31]
+        played = self.state[4,0:8] +self.state[4,8:16] + self.state[4,17:23] + self.state[4,24:31]
         played[np.where(played>=1)] = 1
         if np.allclose(played, ZEROES): #Empty board any attack is legal
             LegaltoAdd = np.ones(32)
+            added2 = new[3,:7] + new[3,8:15] + new[3,16:23]
             if len(np.unique(played)!= 1): # Ensure only one denomination of card is played
                 return False
             self.state = new
@@ -148,13 +150,34 @@ class Game:
 
         """
         new = self.state + move
-
-        if np.sum(new[3,:]) != 0: # Attempted redirect
-            if np.sum(self.state[4:0]) != 0:
-                return False # Cant redirect if you already started defending
+        assert np.allclose(move[1-player], ZEROES) # Opponents hand doesnt change
+        assert np.allclose(move[2,:],ZEROES) #Cards arent being pulled
         
 
+        if np.sum(new[3,:]) != 0: # Attempted redirect or flash
+            if np.sum(self.state[4:0]) != 0:
+                return False # Cant redirect if you already started defending
+            if np.sum(move[3,:]) == 0: #TODO Check for flash
+
+                pass
+            else: #TODO Check for redirect
+                pass
+        else:
+            if np.sum(new[3,:])+1==np.sum(self.state[3,:]) and (np.sum(move[4,:] == 2)): # Attempted Defense of exactly 1 card
+                cardsdefended  = np.where(move==-1)[0]
+
+                cardsused = move[4,:]-move[np.where(move==-1)]
+                if not np.allclose(cardsused @ self.state[player,:], cardsused):
+                    print(f'Cards have been used that arent in player {player}`s hand')
+                    return False
+                pass
+            else: #attempted pickup
+                #TODO
+                pass
+
         pass
+    
+
 
             
         
