@@ -12,12 +12,15 @@ class Move:
         if move_matrix is not None:
             assert type(move_matrix) == np.ndarray, "Move matrix must be a numpy array"
             assert move_matrix.shape == (6,32), "Move matrix must have shape (6,32)"
-            assert move_matrix.dtype == bool, "Move matrix must be a boolean array"
+            assert move_matrix.dtype == int, "Move matrix must be a int array"
             self.move_matrix = move_matrix
         else:
-            self.move_matrix = np.zeros((6, 32), dtype=bool)
+            self.move_matrix = np.zeros((6, 32), dtype=int)
 
         self.move_type = move_type
+
+    def __str__(self) -> str:
+        return f"Move type: {self.move_type}\nMove matrix:\n{self.move_matrix}"
 
     def get_move_matrix(self) -> np.ndarray:
         return self.move_matrix
@@ -30,8 +33,8 @@ class Move:
             raise ValueError("Row index must be between 0 and 5")
         if row.shape != (32,):
             raise ValueError("Row must have shape (32,)")
-        if row.dtype != bool:
-            raise ValueError("Row must be a boolean array")
+        if row.dtype != int:
+            raise ValueError("Row must be a integer array")
         
         self.move_matrix[row_index] = row
     
@@ -80,7 +83,8 @@ class Player:
 
         return "\n".join(selection_str_components)
 
-    def select_own_card(self, state_wrapper: State):
+    def select_own_card(self, state_wrapper: State) -> Optional[np.ndarray]:
+        # TODO: Add ability to select no card (cancel)
         own_cards = state_wrapper.get_p0_cards() if self.player_id == 0 else state_wrapper.get_p1_cards()
         own_cards_str = self.card_visualiser.convert_cards_to_strings(own_cards)
 
@@ -89,8 +93,12 @@ class Player:
         print(own_card_selection)
 
         while True:
+            selection_input = input("Select the index of the card you want to play (type 'c' to cancel): ")
+            if selection_input == "c":
+                return None
+            
             try:
-                selected_card_index = int(input("Select the index of the card you want to play: "))
+                selected_card_index = int(selection_input)
             except ValueError:
                 print(f"Invalid input. Please enter a number between 0 and {len(own_cards_str) - 1}.")
                 continue
@@ -121,8 +129,16 @@ class Player:
 
             elif command == "s":
                 selected_card = self.select_own_card(current_state)
+                if selected_card is None:
+                    continue
+                
                 new_move = Move(MoveType.ATTACK)
-                new_move.set_move_row(0, - np.array(selected_card, dtype=bool)) # FIXME:
+
+                new_move.set_move_row(StateMatrix.PLAYER_0.value, - selected_card)
+                new_move.set_move_row(StateMatrix.LEFT2DEF.value, selected_card)
+
+                current_state.apply_move(new_move)
+
                 current_move += new_move
 
             elif command == "e":

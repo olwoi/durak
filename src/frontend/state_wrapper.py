@@ -49,4 +49,8 @@ class State:
         return self.state_matrix[5, 12]
     
     def apply_move(self, move: 'Move'):
-        self.state_matrix += move.get_move_matrix()
+        new_state_matrix = move.get_move_matrix() + np.array(self.state_matrix, dtype=int)
+        if np.any((new_state_matrix != 0) * (new_state_matrix != 1)):
+            raise ValueError("State matrix must contain only 0s and 1s")
+        
+        self.state_matrix = np.array(new_state_matrix, dtype=bool)
