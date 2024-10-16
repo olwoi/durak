@@ -1,4 +1,5 @@
 import numpy as np
+#from frontend.input import Move
 
 class State:
     def __init__(self, state_matrix: np.ndarray):
@@ -32,11 +33,20 @@ class State:
     def get_trump_card(self) -> np.ndarray:
         return np.append(self.state_matrix[5, :8], np.zeros(24, dtype=bool))
     
-    def get_is_p0_turn(self) -> int:
+    def get_is_p0_turn(self) -> bool:
         return self.state_matrix[5, 8]
     
-    def get_is_p0_attacking(self) -> int:
+    def get_is_p0_attacking(self) -> bool:
         return self.state_matrix[5, 9]
     
-    def get_is_pickup(self) -> int:
+    def get_is_pickup(self) -> bool:
         return self.state_matrix[5, 10]
+    
+    def get_is_over(self) -> bool:
+        return self.state_matrix[5, 11]
+    
+    def get_p0_won(self) -> bool:
+        return self.state_matrix[5, 12]
+    
+    def apply_move(self, move: 'Move'):
+        self.state_matrix += move.get_move_matrix()
