@@ -41,11 +41,11 @@ class Game:
 
         self.state[5,coser] = 1
 
-    
+    #Legacy Code
     def send_state(self,boolean):
         return self.state,boolean
 
-
+    # Legacy code
     def user_update(self, move):
         if self.state[5,8] and self.state[5,9]: # Player 0's turn to attack
             legal = self.attack(move,0) # Player 0 attacks
@@ -80,8 +80,6 @@ class Game:
         """
         assert np.allclose(move[1-player], ZEROES) # Opponents hand doesnt change
         assert np.allclose(move[2,:],ZEROES) #Cards arent being pulled
-
-        #TODO make sure that opponent has enough cards left 2 defend
 
         new = self.state + move
         
@@ -145,10 +143,14 @@ class Game:
             else:
                 print("Defender doesnt have enough cards")
                 return (False,False)
+        else:
         
-        print("unaccouted for state")
-        return False, False
+            print("Cant add card that hasnt been played")
+            return False, False
     def defend(self,move,player):
+        """
+        Calls _defend and sets self.state if appropriate
+        """
         valid,is_redirect,is_complete = self._defend(move,player)
         if valid:
             self.state = np.array(self.state+move,dtype=bool)
@@ -210,13 +212,49 @@ class Game:
                 return (False,False,False)
                 
     def check_wurf(self,move,player):
+        assert move[3,:] - move[player, :] == 0
+        if not np.allclose(self.state[player,:]@move[3,:].T,move[3,:].T):
+            print("Player added a card thats not in their hand")
+            return False
         
+        played = self.state[4,0:8] +self.state[4,8:16] + self.state[4,17:23] + self.state[4,24:31]
+        played[np.where(played>=1)] = 1
+        LegaltoAdd = np.zeros(32)
+        indices = np.where(played == 1)[0]
+        LegaltoAdd[indices] = 1
+        LegaltoAdd[indices + 8] = 1
+        LegaltoAdd[indices + 16] = 1
+        LegaltoAdd[indices + 24] = 1
+
+        leftdefendmove = self.state[3,:] + move[3,:]
+        if np.isclose(np.sum(leftdefendmove),np.dot(LegaltoAdd,leftdefendmove)):
+            return True
+        else:
+            print("Cant add card that hasnt been played")
+            return False
+
         pass
+
+    def ExecutePickup(self,player):
+        """
+        Empties left2def and onboard and gives these cards to player
+        """
+
+        self.state[player,:] +=self.state[4,:]
+        self.state[3,:] = False
+        self.state[4,:] = False 
+
+        return
+
     def drawto6(self,attacker,rek=False):
+        """
+        Draws cards for attacker first then for defender, if there are no cards left at a point sets winner variables
+    
+        """
         cardsleftattacker = np.sum(self.state[attacker,:])
         cardsleft = len(self.deck)
         if cardsleftattacker <6:
-            if cardsleft == 0:
+            if cardsleft == 0 and cardsleftattacker == 0:
                 self.state[5,11] = 1
                 self.state[5,12] = 1-attacker
                 return
@@ -231,14 +269,6 @@ class Game:
                     self.deck = self.deck[6-cardsleftattacker:]
         if not rek:
             self.drawto6(1-attacker,rek=True)
-
-        
-    
-
-
-            
-        
-    
 
 
 if __name__ == '__main__':
