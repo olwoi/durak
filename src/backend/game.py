@@ -32,11 +32,12 @@ class Game:
         deck = np.random.permutation(32)
         coser = np.random.randint(0,7)
         deck = deck[np.where(deck != coser)]
+        
 
         self.state[2,0:] = 1 # Set all cards to unplayed
         self.state[0,0:],self.state[2,0:]=set_hand(self.state[0,0:],deck[0:6],self.state[2,0:])
         self.state[1,0:],self.state[2,0:]=set_hand(self.state[1,0:],deck[6:12],self.state[2,0:])
-        self.deck = deck[12:]
+        self.deck = np.append(deck[12:],coser)
 
         self.state[5,coser] = 1
 
@@ -211,8 +212,25 @@ class Game:
     def check_wurf(self,move,player):
         
         pass
-    def drawto6(self,attacker,defender):
-        pass
+    def drawto6(self,attacker,rek=False):
+        cardsleftattacker = np.sum(self.state[attacker,:])
+        cardsleft = len(self.deck)
+        if cardsleftattacker <6:
+            if cardsleft == 0:
+                self.state[5,11] = 1
+                self.state[5,12] = 1-attacker
+                return
+            else:
+                if cardsleft < 6-cardsleftattacker:
+                    self.state[attacker,self.deck] = 1
+                    self.state[2,self.deck] = 0
+                    self.deck = []
+                else:
+                    self.state[attacker,self.deck[0:6-cardsleftattacker]] = 1
+                    self.state[2,self.deck[0:6-cardsleftattacker]] = 0
+                    self.deck = self.deck[6-cardsleftattacker:]
+        if not rek:
+            self.drawto6(1-attacker,rek=True)
 
         
     
