@@ -37,15 +37,18 @@ class BoardVisualiser:
         return player_str
     
     def _get_metadata_str(self, unplayed_cards: np.ndarray) -> str:
-        n_unplayed_cards = len(unplayed_cards)
-        unplayed_str = f"Number of unplayed (in deck) cards: {n_unplayed_cards}"
-        # unplayed_str = " ".join(unplayed_cards)
+        if self.state_wrapper.get_is_over():
+            unplayed_str = f"---> GAME OVER, no cards left to draw. Player {int(not self.state_wrapper.get_p0_won())} won! <---"
+        else:
+            n_unplayed_cards = len(unplayed_cards)
+            unplayed_str = f"Number of unplayed (in deck) cards: {n_unplayed_cards}"
+            # unplayed_str = " ".join(unplayed_cards)
 
         trump_card = self.state_wrapper.get_trump_card()
-        trump_str = f"The trump card is: {self.card_visualiser.convert_cards_to_strings(trump_card)[0]}"
+        trump_str = f"The trump card is: {self.card_visualiser.convert_cards_to_strings(trump_card)}"
         
-        turn_str = f"Turn: Player {int(~self.state_wrapper.get_is_p0_turn())}"
-        attacker_str = f"Attacker: Player {int(~self.state_wrapper.get_is_p0_attacking())}"
+        turn_str = f"Turn: Player {int(not self.state_wrapper.get_is_p0_turn())}"
+        attacker_str = f"Attacker: Player {int(not self.state_wrapper.get_is_p0_attacking())}"
 
         return "\n".join([unplayed_str, trump_str, attacker_str, turn_str])
     
