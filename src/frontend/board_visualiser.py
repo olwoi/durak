@@ -1,95 +1,61 @@
 from frontend.state_wrapper import State
-from frontend.card_visualiser import CardVisualiser, RANKS, SUITS
+from frontend.card_visualiser import CardVisualiser
+from frontend.constants import RANKS, SUITS
 import numpy as np
 
 class BoardVisualiser:
-    def __init__(self, state: State, trump_suit: int):
-        self.state = state
+    def __init__(self, state_matrix: np.ndarray, trump_suit: int):
+        state_wrapper = State(state_matrix)
+        self.state_wrapper = state_wrapper
         self.card_visualiser = CardVisualiser(trump_suit)
+
+    # TODO: Add a set_state_matrix function 
 
     def __str__(self):
         return self.visualise_board()
     
     def visualise_board(self) -> str:
-        """
-        Visualises the current state of the board.
-        
-        Returns:
-            str: A string representation of the current state of the board.
-        """
-        p0_cards = self.card_visualiser.convert_cards_to_strings(self.state.get_p0_cards())
-        p1_cards = self.card_visualiser.convert_cards_to_strings(self.state.get_p1_cards())
-        unplayed_cards = self.card_visualiser.convert_cards_to_strings(self.state.get_unplayed_cards())
-        left_to_defend_cards = self.card_visualiser.convert_cards_to_strings(self.state.get_left_to_defend_cards())
-        cards_on_board = self.card_visualiser.convert_cards_to_strings(self.state.get_cards_on_board())
-        metadata = self.state.get_metadata()
+        p0_cards = self.card_visualiser.convert_cards_to_strings(self.state_wrapper.get_p0_cards())
+        p1_cards = self.card_visualiser.convert_cards_to_strings(self.state_wrapper.get_p1_cards())
+        unplayed_cards = self.card_visualiser.convert_cards_to_strings(self.state_wrapper.get_unplayed_cards())
+        left_to_defend_cards = self.card_visualiser.convert_cards_to_strings(self.state_wrapper.get_left_to_defend_cards())
+        cards_on_board = self.card_visualiser.convert_cards_to_strings(self.state_wrapper.get_cards_on_board())
         
         p0_cards_str = self._get_player_cards_str(p0_cards, 0)
         p1_cards_str = self._get_player_cards_str(p1_cards, 1)
-        unplayed_cards_str = self._get_metadata_str(unplayed_cards, metadata)
+        metadata_str = self._get_metadata_str(unplayed_cards)
         left_to_defend_cards_str = self._get_left_to_defend_cards_str(left_to_defend_cards)
         cards_on_board_str = self._get_cards_on_board_str(cards_on_board, left_to_defend_cards)
         
         #return f"{p0_cards_str}\n\n{p1_cards_str}\n\n{unplayed_cards_str}\n\n{left_to_defend_cards_str}\n\n{cards_on_board_str}"
-        return "\n\n".join([unplayed_cards_str, cards_on_board_str, left_to_defend_cards_str, p0_cards_str, p1_cards_str,])
+        return "\n\n".join([metadata_str, cards_on_board_str, left_to_defend_cards_str, p0_cards_str, p1_cards_str,])
     
     def _get_player_cards_str(self, player_cards: np.ndarray, player_id: int) -> str:
-        """
-        Gets the string representation of a player's cards.
-        
-        Parameters:
-            cards (np.ndarray): The cards of the player.
-            player_id (int): The ID of the player.
-        
-        Returns:
-            str: A string representation of the player's cards.
-        """
         player_str = f"Player {player_id} cards: "
         player_str += " ".join(player_cards)
         
         return player_str
     
-    def _get_metadata_str(self, unplayed_cards: np.ndarray, metadata: np.ndarray) -> str:
+    def _get_metadata_str(self, unplayed_cards: np.ndarray) -> str:
         n_unplayed_cards = len(unplayed_cards)
-        # TODO: Change back after verification
-        # unplayed_str = f"Number of unplayed (in deck) cards: {n_unplayed_cards}"
-        unplayed_str = " ".join(unplayed_cards)
+        unplayed_str = f"Number of unplayed (in deck) cards: {n_unplayed_cards}"
+        # unplayed_str = " ".join(unplayed_cards)
 
-        trump_rank = RANKS[metadata[:8].argmax()]
-        trump_suit = SUITS[self.card_visualiser.suit_indices[0]]
-        trump_str = f"The trump card is: {trump_rank}{trump_suit}"
+        trump_card = self.state_wrapper.get_trump_card()
+        trump_str = f"The trump card is: {self.card_visualiser.convert_cards_to_strings(trump_card)[0]}"
         
-        turn_str = f"It is currently Player {int(~metadata[8])}'s turn"
-        attacker_str = f"Attacker: Player {int(~metadata[9])}"
+        turn_str = f"Turn: Player {int(~self.state_wrapper.get_is_p0_turn())}"
+        attacker_str = f"Attacker: Player {int(~self.state_wrapper.get_is_p0_attacking())}"
 
         return "\n".join([unplayed_str, trump_str, attacker_str, turn_str])
     
     def _get_left_to_defend_cards_str(self, left_to_defend_cards: np.ndarray) -> str:
-        """
-        Gets the string representation of the cards left to defend.
-        
-        Parameters:
-            cards (np.ndarray): The cards left to defend.
-        
-        Returns:
-            str: A string representation of the cards left to defend.
-        """
         left_to_defend_str = f"Cards left to defend: "
         left_to_defend_str += " ".join(left_to_defend_cards)
         
         return left_to_defend_str
     
     def _get_cards_on_board_str(self, cards_on_board: np.ndarray, left_to_defend_cards: np.ndarray) -> str:
-        """
-        Gets the string representation of the cards on the board.
-        
-        Parameters:
-            cards_on_board (np.ndarray): The cards currently on the board.
-            left_to_defend_cards (np.ndarray): The cards that are left to defend.
-        
-        Returns:
-            str: A string representation of the cards on the board.
-        """
         cards_on_board_str = f"Cards on board (no longer needed to defend): "
 
         cards_on_board_not_to_defend = np.setdiff1d(cards_on_board, left_to_defend_cards)

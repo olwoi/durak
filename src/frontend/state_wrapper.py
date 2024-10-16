@@ -29,3 +29,14 @@ class State:
     def get_metadata(self) -> np.ndarray:
         return self.state_matrix[5]
     
+    def get_trump_card(self) -> np.ndarray:
+        return np.append(self.state_matrix[5, :8], np.zeros(24, dtype=bool))
+    
+    def get_is_p0_turn(self) -> int:
+        return self.state_matrix[5, 8]
+    
+    def get_is_p0_attacking(self) -> int:
+        return self.state_matrix[5, 9]
+    
+    def get_is_pickup(self) -> int:
+        return self.state_matrix[5, 10]
