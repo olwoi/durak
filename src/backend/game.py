@@ -22,7 +22,7 @@ class Game:
     3       |   Cards left to Defend | 0: Trump Ace, 1: Trump King, etc
     4       |   Cards Played on Board| 0: Trump Ace, 1: Trump King, etc
     5       |   Coser | Extra Values | 0: Ace,...,7: Seven, 8: Player 0's Turn,
-    5       |       Extra Values     | 9: Player 0 is attacking
+    5       |       Extra Values     | 9: Player 0 is attacking, 10 is pickup, 11 is_over, 12 P0_won
     """
 
     def __init__(self):
@@ -72,7 +72,10 @@ class Game:
         Params:
             move: ndarray() Changes made to state by player
             player: 0-1 indicates what player attempted to do this move
-        
+        Returns:
+            valid: Bool True if the move played is valid and executed
+            Beaten: Bool True if no cards where added to left to defend
+
         """
         assert np.allclose(move[1-player], ZEROES) # Opponents hand doesnt change
         assert np.allclose(move[2,:],ZEROES) #Cards arent being pulled
@@ -87,12 +90,12 @@ class Game:
         
         if not np.isclose(self.state[1-player,0:],new[1-player,0:]): # Opponents hand is the same post and pre move
             print("Opponents cards changed during attack")
-            return False
+            return (False, False)
         
         #Any card that is added to left 2 defend hast to be also added to cards on board
         if not np.allclose(move[3,0:],move[4,0:]): 
             print("Cards played on board not updated")
-            return False
+            return (False, False)
 
 
         # Isolate all the values of cards that could legally could be added to the board :LegalToAdd
@@ -102,11 +105,17 @@ class Game:
             LegaltoAdd = np.ones(32)
             added2 = new[3,:7] + new[3,8:15] + new[3,16:23]
             if len(np.unique(played)!= 1): # Ensure only one denomination of card is played
-                return False
-            self.state = new
-            return True
+                return (False, False)
+            if np.sum(new[3,:])<= np.sum(new[1-player,:]):
+                self.state = new
+                return (True, False)
+            else:
+                print("Defender doesnt have enough cards")
+                return (False,False)
             
-        else:
+        else: #Board is not empty
+            if np.sum(move) == 0:
+                return (True, True)
             LegaltoAdd = np.zeros(32)
             
             #Make multiple occurences of cards of same denomination be no issue
@@ -125,21 +134,25 @@ class Game:
 
         if np.allclose(ONES@new[3,0:].T,self.state[player,0:]@new[3,0:].T):
             print("Player added cards that were not in their hand")
-            return False
+            return (False, False)
 
-        # Cant add card that has not been played UNLESS it is the first move
+        # Cant add card that has not been played 
         if np.isclose(np.sum(leftdefendmove),np.dot(LegaltoAdd,leftdefendmove)): 
-            if not np.isclose(np.sum(indices),0):
+            if np.sum(new[3,:])<= np.sum(new[1-player,:]):
                 self.state = new
-                return True
-            print("Player added cards that were not on the board")
-            return False
+                return (True, False)
+            else:
+                print("Defender doesnt have enough cards")
+                return (False,False)
         
-
-        self.state = new
-        return True
-    
+        print("unaccouted for state")
+        return False, False
     def defend(self,move,player):
+        valid,is_redirect,is_complete = self._defend(move,player)
+        if valid:
+            self.state = np.array(self.state+move,dtype=bool)
+        return (valid,is_redirect,is_complete)
+    def _defend(self,move,player):
         """
         Checks that move is a valid defence, meaning that all cards that were being attacked where defended
         To do this following needs to be checked:
@@ -147,35 +160,61 @@ class Game:
         - The cards that were used in defence (move row 4) were in the hand of the player (row player)
         - The cards that were used in defence (move row 4) were on the board (row 4)
         - The cards that were used in defence (move row 4) are no longer in the hand of the player (row player)
-
+        Params:
+            move: newstate - self.state
+            player: player thats playing
+        
+        Returns:
+            valid: Bool
+            
         """
         new = self.state + move
         assert np.allclose(move[1-player], ZEROES) # Opponents hand doesnt change
         assert np.allclose(move[2,:],ZEROES) #Cards arent being pulled
         
 
-        if np.sum(new[3,:]) != 0: # Attempted redirect or flash
-            if np.sum(self.state[4:0]) != 0:
-                return False # Cant redirect if you already started defending
-            if np.sum(move[3,:]) == 0: #TODO Check for flash
-
-                pass
+        if np.sum(new[3,:]) >= np.sum(self.state[3,:]): # Attempted redirect or flash
+            if np.sum(self.state[4:0]-self.state[3,:]) != 0:
+                return (False,False,False) # Cant redirect if you already started defending
+            
+            rankonboard = self.state[4,0:8] +self.state[4,8:16] + self.state[4,17:23] + self.state[4,24:31]
+            
+            if np.sum(move[3,:]) == 0 and np.allclose(move[player,:],ZEROES) : 
+                if self.state[player,np.where(rankonboard>=1)[0]] != 1:
+                    print("player doesnt have the trump card to redirect")
+                    return (False,False,False)
+                else:
+                    return (True,True,False)
             else: #TODO Check for redirect
-                pass
+                redirectedcard = np.where(move[3,:]==1)
+                if np.allclose(np.where(rankonboard==1),(redirectedcard%7)): #The card added by move must be of same rank 
+                    return (True,True,False)
+                else:
+                    print("Card of wrong rank used to redirect")
+                    return (False,False,False)   
         else:
             if np.sum(new[3,:])+1==np.sum(self.state[3,:]) and (np.sum(move[4,:] == 2)): # Attempted Defense of exactly 1 card
                 cardsdefended  = np.where(move==-1)[0]
 
-                cardsused = move[4,:]-move[np.where(move==-1)]
-                if not np.allclose(cardsused @ self.state[player,:], cardsused):
+                cardsused = ZEROES - move[3,:]
+                if not np.allclose(cardsused @ self.state[player,:].T, cardsused):
                     print(f'Cards have been used that arent in player {player}`s hand')
-                    return False
-                pass
-            else: #attempted pickup
-                #TODO
-                pass
-
+                    return (False,False,False)
+                else:
+                    if np.sum(new[3,:]) == 0:
+                        return (True,False,True)
+                    return(True,False,False)
+            else:
+                print("Unaccouted for sequence")
+                return (False,False,False)
+                
+    def check_wurf(self,move,player):
+        
         pass
+    def drawto6(self,attacker,defender):
+        pass
+
+        
     
 
 
