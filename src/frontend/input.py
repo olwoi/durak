@@ -116,7 +116,7 @@ class Player:
 
         return selected_card
 
-    def get_attack(self, state_matrix: np.ndarray):
+    def get_attack(self, state_matrix: np.ndarray) -> Move:
         current_state = State(state_matrix)
         current_move = Move(MoveType.ATTACK)
 
@@ -131,10 +131,13 @@ class Player:
                 selected_card = self.select_own_card(current_state)
                 if selected_card is None:
                     continue
-                
+
                 new_move = Move(MoveType.ATTACK)
 
-                new_move.set_move_row(StateMatrix.PLAYER_0.value, - selected_card)
+                if self.player_id == 0:
+                    new_move.set_move_row(StateMatrix.PLAYER_0.value, selected_card)
+                else:
+                    new_move.set_move_row(StateMatrix.PLAYER_1.value, selected_card)
                 new_move.set_move_row(StateMatrix.LEFT2DEF.value, selected_card)
 
                 current_state.apply_move(new_move)
