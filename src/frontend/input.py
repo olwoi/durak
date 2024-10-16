@@ -138,7 +138,9 @@ class Player:
                     new_move.set_move_row(StateMatrix.PLAYER_0.value, - selected_card)
                 else:
                     new_move.set_move_row(StateMatrix.PLAYER_1.value, - selected_card)
+                    
                 new_move.set_move_row(StateMatrix.LEFT2DEF.value, selected_card)
+                new_move.set_move_row(StateMatrix.ON_BOARD.value, selected_card)
 
                 current_state.apply_move(new_move)
 
