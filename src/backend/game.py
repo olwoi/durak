@@ -102,7 +102,7 @@ class Game:
         if not np.allclose(-move[player,:], move[3,:]):
             print("Card removed without adding to board")
             return(False,False)
-        if not np.allclose(ONES*new[3,0:].T,self.state[player,0:]*new[3,0:].T):
+        if not np.allclose(new[3,0:],self.state[player,0:]*new[3,0:]):
             print("Player added cards that were not in their hand")
             return (False, False)
 
