@@ -26,6 +26,7 @@ class Game:
     """
 
     def __init__(self):
+        np.random.seed(47)
 
         self.state = np.zeros((6, 32), dtype=bool)
         # Shuffle deck and deal cards
@@ -64,9 +65,12 @@ class Game:
         elif self.state[5,8] and not self.state[5,10]: # Player 0's turn to defend
             pass
     
-
-        
     def attack(self,move,player):
+        out = self._attack(move,player)
+        self.state = np.array(self.state,dtype=bool)
+        return out
+        
+    def _attack(self,move,player):
         """
         Checks whether move is legal if so updates it and returns true, false otherwise
         
@@ -87,7 +91,7 @@ class Game:
         # Check whether player has been updated correctly
         # Check that oppononents cards havent changed
         
-        if not np.isclose(self.state[1-player,0:],new[1-player,0:]): # Opponents hand is the same post and pre move
+        if not np.allclose(self.state[1-player,0:],new[1-player,0:]): # Opponents hand is the same post and pre move
             print("Opponents cards changed during attack")
             return (False, False)
         
@@ -95,15 +99,24 @@ class Game:
         if not np.allclose(move[3,0:],move[4,0:]): 
             print("Cards played on board not updated")
             return (False, False)
+        if not np.allclose(-move[player,:], move[3,:]):
+            print("Card removed without adding to board")
+            return(False,False)
+        if not np.allclose(ONES*new[3,0:].T,self.state[player,0:]*new[3,0:].T):
+            print("Player added cards that were not in their hand")
+            return (False, False)
 
 
         # Isolate all the values of cards that could legally could be added to the board :LegalToAdd
-        played = self.state[4,0:8] +self.state[4,8:16] + self.state[4,17:23] + self.state[4,24:31]
+        played = self.state[4,0:8] +self.state[4,8:16] + self.state[4,16:24] + self.state[4,24:32]
         played[np.where(played>=1)] = 1
-        if np.allclose(played, ZEROES): #Empty board any attack is legal
+        if np.allclose(played, np.zeros(8)): #Empty board any attack is legal
+
             LegaltoAdd = np.ones(32)
-            added2 = new[3,:7] + new[3,8:15] + new[3,16:23]
-            if len(np.unique(played)!= 1): # Ensure only one denomination of card is played
+            added2 = new[3,:8] + new[3,8:16] + new[3,16:24] + new[3,24:]
+            
+            if len(added2[np.where(added2!= 0)])>= 2: # Ensure only one denomination of card is played
+                print("more than 1 denomination")
                 return (False, False)
             if np.sum(new[3,:])<= np.sum(new[1-player,:]):
                 self.state = new
@@ -131,9 +144,7 @@ class Game:
         # ONES@new[3,0:].T Whatever cards that have been added by the player
         # self.state[player,0:]@new[3,0:].T The cards that have been played that are also in the had previously
 
-        if np.allclose(ONES@new[3,0:].T,self.state[player,0:]@new[3,0:].T):
-            print("Player added cards that were not in their hand")
-            return (False, False)
+        
 
         # Cant add card that has not been played 
         if np.isclose(np.sum(leftdefendmove),np.dot(LegaltoAdd,leftdefendmove)): 
@@ -273,4 +284,17 @@ class Game:
 
 if __name__ == '__main__':
     game = Game()
-        
+    # print(game.state)
+    move = np.zeros((6,32))
+    move[1,0] = -1
+    move[3,0] = 1
+    move[4,0] = 1
+    # move[1,1] = -1
+    # move[3,1] = 1
+    # move[4,1] = 1
+    out = game.attack(move,1)
+    if out[0]:
+        print(game.state)
+    
+    print(out)
+    
