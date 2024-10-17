@@ -1,3 +1,7 @@
 src/venv
 *.DS_Store
 *.code-workspace
+
+# Byte-compiled / optimized / DLL files
+*.pyc
+**/__pycache__

@@ -1,7 +1,5 @@
 import numpy as np
-
-RANKS = np.array(['A', 'K', 'Q', 'J', 'T', '9', '8', '7'])
-SUITS = np.array(['♠', '♣', '♦', '♥'])
+from frontend.constants import RANKS, SUITS
 
 class CardVisualiser():
     def __init__(self, trump_suit: int):
