@@ -64,7 +64,7 @@ class Game:
                 self.send_state(True)
         elif self.state[5,8] and not self.state[5,10]: # Player 0's turn to defend
             pass
-    
+   
     def attack(self,move,player):
         out = self._attack(move,player)
         self.state = np.array(self.state,dtype=bool)
@@ -188,36 +188,51 @@ class Game:
         
 
         if np.sum(new[3,:]) >= np.sum(self.state[3,:]): # Attempted redirect or flash
-            if np.sum(self.state[4:0]-self.state[3,:]) != 0:
+            if np.sum(self.state[4:0]^self.state[3,:]) != 0:
                 return (False,False,False) # Cant redirect if you already started defending
             
-            rankonboard = self.state[4,0:8] +self.state[4,8:16] + self.state[4,17:23] + self.state[4,24:31]
+            rankonboard = self.state[4,0:8] +self.state[4,8:16] + self.state[4,16:24] + self.state[4,24:]
             
-            if np.sum(move[3,:]) == 0 and np.allclose(move[player,:],ZEROES) : 
+            if np.sum(move[3,:]) == 0 and np.allclose(move[player,:],ZEROES) : #Attempted Flash
                 if self.state[player,np.where(rankonboard>=1)[0]] != 1:
                     print("player doesnt have the trump card to redirect")
                     return (False,False,False)
                 else:
                     return (True,True,False)
-            else: #TODO Check for redirect
-                redirectedcard = np.where(move[3,:]==1)
-                if np.allclose(np.where(rankonboard==1),(redirectedcard%7)): #The card added by move must be of same rank 
+            else: #Normal redirect
+                redirectedcard = np.where(move[3,:]==1)[0]
+                if np.allclose(np.where(rankonboard==1)[0],(redirectedcard%8)): #The card added by move must be of same rank 
                     return (True,True,False)
                 else:
                     print("Card of wrong rank used to redirect")
                     return (False,False,False)   
         else:
-            if np.sum(new[3,:])+1==np.sum(self.state[3,:]) and (np.sum(move[4,:] == 2)): # Attempted Defense of exactly 1 card
+            print("we here")
+            print(f"{ np.sum(new[3,:])+1==np.sum(self.state[3,:])}")
+            if np.sum(new[3,:])+1==np.sum(self.state[3,:]) and (np.sum(move[4,:]) == 1): # Attempted Defense of exactly 1 card
                 cardsdefended  = np.where(move==-1)[0]
 
-                cardsused = ZEROES - move[3,:]
-                if not np.allclose(cardsused @ self.state[player,:].T, cardsused):
+                card2def = ZEROES - move[3,:]
+                defendingcard = move[4,:]
+        
+
+                if not np.allclose(defendingcard * self.state[player,:], defendingcard):
+                    print(defendingcard)
+                    print(defendingcard * self.state[player,:])
                     print(f'Cards have been used that arent in player {player}`s hand')
                     return (False,False,False)
-                else:
-                    if np.sum(new[3,:]) == 0:
-                        return (True,False,True)
-                    return(True,False,False)
+                card2def=card2def[np.where(card2def==1)]
+                defendingcard = defendingcard[np.where(defendingcard==1)]
+                if card2def//8 == defendingcard//8: #Defense with same suit
+                    if card2def<defendingcard:
+                        print("Card is of the same suit but too low")
+                        return (False,False,False)
+                elif card2def//8 != 0:
+                    print("Card isnt of the same suit and isnt trump")
+                    return (False,False,False)
+                if np.sum(new[3,:]) == 0:
+                    return (True,False,True)
+                return(True,False,False)
             else:
                 print("Unaccouted for sequence")
                 return (False,False,False)
