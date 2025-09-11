@@ -41,6 +41,41 @@ class Game:
         self.deck = np.append(deck[12:],coser)
 
         self.state[5,coser] = 1
+        
+        # Initialize game state: Player 0 starts and is attacking
+        self.state[5,8] = 1  # Player 0's turn
+        self.state[5,9] = 1  # Player 0 is attacking
+        self._defense_matrix = self._build_defense_matrix()
+
+    
+    def _build_defense_matrix(self):
+        """
+        Precompute which cards can defend which attacks in a 32x32 boolean matrix.
+        
+        Matrix Structure:
+        - Rows represent attacking cards (0-31)
+        - Columns represent defending cards (0-31) 
+        - defense_matrix[attack_card][defend_card] = True if defend_card can beat attack_card
+        
+        """
+        defense_matrix = np.zeros((32, 32), dtype=bool)
+        
+        cards = np.arange(32)
+        suits = cards // 8
+        ranks = cards % 8
+        
+        # Vectorized computation of all defense relationships
+        for attack_card in range(32):
+            attack_suit, attack_rank = attack_card // 8, attack_card % 8
+            
+            # Same suit, higher rank
+            same_suit = (suits == attack_suit) & (ranks > attack_rank)
+            # Trump vs non-trump
+            trump_defense = (suits == 0) & (attack_suit != 0)
+            
+            defense_matrix[attack_card] = same_suit | trump_defense
+        
+        return defense_matrix
 
     #Legacy Code
     def send_state(self,boolean):
@@ -296,7 +331,267 @@ class Game:
         if not rek:
             self.drawto6(1-attacker,rek=True)
 
-
+    def generate_all_moves_vectorized(self, player, is_attacking=True):
+        """
+        Ultra-efficient move generation using pure numpy operations
+        
+        Args:
+            player: 0 or 1
+            is_attacking: True for attack moves, False for defense moves
+            
+        Returns:
+            np.ndarray: Shape (n_moves, 6, 32) containing all possible moves
+        """
+        if is_attacking:
+            return self._generate_attack_moves_vectorized(player)
+        else:
+            return self._generate_defense_moves_vectorized(player)
+    
+    def _generate_attack_moves_vectorized(self, player):
+        """Generate attack moves using pure numpy operations"""
+        player_hand = self.state[player, :]
+        opponent_cards = np.sum(self.state[1-player, :])
+        
+        # Get board state
+        played = self.state[4, 0:8] + self.state[4, 8:16] + self.state[4, 16:24] + self.state[4, 24:32]
+        played = (played >= 1).astype(bool)
+        
+        # Get hand cards grouped by rank
+        hand_by_rank = np.zeros((8, 4), dtype=bool)
+        for rank in range(8):
+            for suit in range(4):
+                hand_by_rank[rank, suit] = player_hand[rank + suit * 8]
+        
+        moves_list = []
+        
+        if not np.any(played):  # Empty board
+            # For each rank that player has cards of
+            for rank in range(8):
+                rank_cards = np.where(hand_by_rank[rank])[0]
+                if len(rank_cards) > 0:
+                    # Generate all non-empty subsets of cards of this rank
+                    max_cards = min(len(rank_cards), opponent_cards)
+                    for subset_size in range(1, max_cards + 1):
+                        # Use bit manipulation to generate all combinations
+                        from itertools import combinations
+                        for card_indices in combinations(rank_cards, subset_size):
+                            move = np.zeros((6, 32), dtype=int)  # Use int instead of bool
+                            for suit_idx in card_indices:
+                                card_idx = rank + suit_idx * 8
+                                move[player, card_idx] = -1  # Remove from hand
+                                move[3, card_idx] = 1
+                                move[4, card_idx] = 1
+                            # No need to convert since we're already using -1
+                            moves_list.append(move)
+        else:  # Non-empty board
+            legal_ranks = np.where(played)[0]
+            current_attack_size = np.sum(self.state[3, :])
+            
+            for rank in legal_ranks:
+                rank_cards = np.where(hand_by_rank[rank])[0]
+                if len(rank_cards) > 0:
+                    max_additional = min(len(rank_cards), opponent_cards - current_attack_size)
+                    for subset_size in range(1, max_additional + 1):
+                        from itertools import combinations
+                        for card_indices in combinations(rank_cards, subset_size):
+                            move = np.zeros((6, 32), dtype=int)  # Use int instead of bool
+                            for suit_idx in card_indices:
+                                card_idx = rank + suit_idx * 8
+                                move[player, card_idx] = -1  # Remove from hand
+                                move[3, card_idx] = 1
+                                move[4, card_idx] = 1
+                            moves_list.append(move)
+            
+            # Add pass move
+            pass_move = np.zeros((6, 32), dtype=int)  # Use int instead of bool
+            moves_list.append(pass_move)
+        
+        if moves_list:
+            return np.array(moves_list)
+        else:
+            return np.array([]).reshape(0, 6, 32)
+    
+    def _generate_defense_moves_vectorized(self, player):
+        """Using precomputed lookup table"""
+        player_hand = self.state[player, :]
+        attack_indices = np.where(self.state[3, :])[0]
+        
+        if len(attack_indices) == 0:
+            return np.array([]).reshape(0, 6, 32)
+        
+        # Use precomputed matrix with boolean indexing
+        valid_defenses = self._defense_matrix[attack_indices] & player_hand[None, :]
+        attack_idx, defend_idx = np.where(valid_defenses)
+        
+        if len(attack_idx) > 0:
+            # Map back to actual attack indices
+            actual_attacks = attack_indices[attack_idx]
+            
+            # Create all moves vectorially
+            n_moves = len(actual_attacks)
+            moves = np.tile(np.zeros((6, 32), dtype=int), (n_moves, 1, 1))
+            moves[np.arange(n_moves), player, defend_idx] = -1
+            moves[np.arange(n_moves), 3, actual_attacks] = -1
+            moves[np.arange(n_moves), 4, defend_idx] = 1
+            
+            # Add pickup
+            pickup = np.zeros((1, 6, 32), dtype=int)
+            return np.vstack([moves, pickup])
+        else:
+            return np.zeros((1, 6, 32), dtype=int)
+    
+    def get_all_legal_moves(self, player, move_type='auto'):
+        """
+        Main interface for getting all legal moves for a player
+        
+        Args:
+            player: 0 or 1
+            move_type: 'attack', 'defense', or 'auto' (determines based on game state)
+            
+        Returns:
+            np.ndarray: All legal moves as (n_moves, 6, 32) array
+        """
+        if move_type == 'auto':
+            # Determine if player should be attacking or defending
+            is_attacking = self._is_player_attacking(player)
+        else:
+            is_attacking = (move_type == 'attack')
+        
+        return self.generate_all_moves_vectorized(player, is_attacking)
+    
+    def _is_player_attacking(self, player):
+        """Determine if a player is in attacking or defending position"""
+        # If there are cards to defend and it's this player's turn to defend
+        cards_to_defend = np.sum(self.state[3, :])
+        player_turn = self.state[5, 8]  # Player 0's turn flag
+        player_attacking = self.state[5, 9]  # Player 0 attacking flag
+        
+        if cards_to_defend > 0:
+            # There are cards on board to defend
+            if player == 0:
+                return not (player_turn and not player_attacking)  # P0 defends when it's their turn but not attacking
+            else:
+                return not (not player_turn and player_attacking)  # P1 defends when it's not P0's turn but P0 is attacking
+        else:
+            # No cards to defend, check who should attack
+            if player == 0:
+                return player_turn and player_attacking
+            else:
+                return not player_turn and not player_attacking
+    
+    def validate_move_fast(self, move, player, is_attacking=None):
+        """
+        Fast move validation using the existing validation logic
+        
+        Args:
+            move: 6x32 move array
+            player: 0 or 1
+            is_attacking: True/False, or None to auto-detect
+            
+        Returns:
+            tuple: (is_valid, additional_info)
+        """
+        if is_attacking is None:
+            is_attacking = self._is_player_attacking(player)
+        
+        if is_attacking:
+            return self._attack(move, player)
+        else:
+            return self._defend(move, player)
+    
+    def count_legal_moves(self, player, move_type='auto'):
+        """
+        Count the number of legal moves without generating them all
+        Useful for game tree analysis
+        """
+        moves = self.get_all_legal_moves(player, move_type)
+        return len(moves)
+    
+    def _generate_attack_moves_fully_vectorized(self, player):
+        """Completely vectorized - no loops at all"""
+        player_hand = self.state[player, :]
+        opponent_cards = np.sum(self.state[1-player, :])
+        
+        # Reshape to work with ranks and suits
+        cards_matrix = self.state[player, :].reshape(4, 8)  # (suits, ranks)
+        board_matrix = self.state[4, :].reshape(4, 8)
+        
+        # Get ranks that are on board and that player has
+        board_ranks = np.any(board_matrix, axis=0)  # Shape: (8,)
+        player_ranks = np.any(cards_matrix, axis=0)  # Shape: (8,)
+        
+        if not np.any(board_ranks):  # Empty board
+            valid_ranks = player_ranks
+        else:  # Non-empty board
+            valid_ranks = player_ranks & board_ranks
+        
+        valid_rank_indices = np.where(valid_ranks)[0]
+        
+        if len(valid_rank_indices) == 0:
+            if np.any(board_ranks):
+                return np.zeros((1, 6, 32), dtype=int)
+            else:
+                return np.array([]).reshape(0, 6, 32)
+        
+        # Generate all moves using pure numpy operations
+        all_moves = []
+        current_attacks = np.sum(self.state[3, :]) if np.any(board_ranks) else 0
+        
+        # Process each rank's card combinations
+        for rank in valid_rank_indices:
+            # Get suits available for this rank
+            available_suits = np.where(cards_matrix[:, rank])[0]
+            n_suits = len(available_suits)
+            
+            if n_suits == 0:
+                continue
+            
+            max_cards = min(n_suits, opponent_cards - current_attacks)
+            if max_cards <= 0:
+                continue
+            
+            # Generate all valid combinations using numpy operations
+            # Create all possible bit patterns for subsets
+            all_patterns = np.arange(1, 2**n_suits)
+            pattern_sizes = np.unpackbits(
+                np.array(all_patterns, dtype=np.uint8).view(np.uint8).reshape(-1, 1), 
+                axis=1, count=n_suits, bitorder='little'
+            ).sum(axis=1)
+            
+            valid_patterns = all_patterns[pattern_sizes <= max_cards]
+            
+            # Convert patterns to actual moves
+            n_valid = len(valid_patterns)
+            if n_valid == 0:
+                continue
+                
+            # Create all moves for this rank at once
+            rank_moves = np.zeros((n_valid, 6, 32), dtype=int)
+            
+            for i, pattern in enumerate(valid_patterns):
+                # Extract selected suits
+                suit_bits = np.unpackbits(
+                    np.array([pattern], dtype=np.uint8), 
+                    count=n_suits, bitorder='little'
+                )[0]
+                selected_suits = available_suits[suit_bits.astype(bool)]
+                
+                # Convert to card indices
+                card_indices = rank + selected_suits * 8
+                
+                # Set move values
+                rank_moves[i, player, card_indices] = -1
+                rank_moves[i, 3, card_indices] = 1
+                rank_moves[i, 4, card_indices] = 1
+            
+            all_moves.extend(rank_moves)
+        
+        # Add pass move if board is not empty
+        if np.any(board_ranks):
+            all_moves.append(np.zeros((6, 32), dtype=int))
+        
+        return np.array(all_moves) if all_moves else np.array([]).reshape(0, 6, 32)
+    
 if __name__ == '__main__':
     game = Game()
     # print(game.state)
@@ -312,4 +607,4 @@ if __name__ == '__main__':
         print(game.state)
     
     print(out)
-    
+
